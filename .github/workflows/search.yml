@@ -1,0 +1,116 @@
+name: Recherche ponctuelle
+
+# Recherche unique lancée à la main : envoie l'e-mail, sans toucher à l'historique ni à config.yaml.
+on:
+  workflow_dispatch:
+    inputs:
+      destination:
+        description: "Destination : ville, pays ou code IATA (ex. Thaïlande, Tokyo, ICN)"
+        required: true
+        type: string
+      origins:
+        description: "Villes de départ, séparées par des virgules (Barcelone ou France)"
+        default: "Barcelone, Paris, Marseille"
+        type: string
+      depart_from:
+        description: "Départ au plus tôt (AAAA-MM-JJ)"
+        required: true
+        type: string
+      depart_to:
+        description: "Départ au plus tard (AAAA-MM-JJ, vide = même jour)"
+        type: string
+      return_date:
+        description: "Date de retour fixe (AAAA-MM-JJ), ou laisser vide et remplir les durées"
+        type: string
+      stay_days:
+        description: "Durées de séjour en jours, séparées par des virgules (ex. 10, 14)"
+        type: string
+      passengers:
+        description: "Nombre de passagers"
+        default: 1
+        type: number
+      cabin:
+        description: "Classe"
+        default: economy
+        type: choice
+        options: [economy, premium-economy, business, first]
+      max_stops:
+        description: "Escales max"
+        default: "2"
+        type: choice
+        options: ["0", "1", "2", "3", "illimité"]
+      layover_min_hours:
+        description: "Durée min de chaque escale, en heures (vide = pas de minimum)"
+        type: string
+      layover_max_hours:
+        description: "Durée max de chaque escale, en heures (vide = pas de maximum)"
+        type: string
+      no_airport_change:
+        description: "Escales sans changement d'aéroport"
+        default: true
+        type: boolean
+      checked_bag:
+        description: "Inclure un bagage en soute (estimation Google)"
+        default: false
+        type: boolean
+      max_duration_hours:
+        description: "Durée max de l'aller, en heures (vide = illimitée)"
+        type: string
+      excluded_airlines:
+        description: "Compagnies exclues : noms et/ou codes IATA, séparés par des virgules"
+        type: string
+      alert_below:
+        description: "Seuil d'alerte en € par personne (vide = aucun)"
+        type: string
+      dry_run:
+        description: "Générer l'e-mail sans l'envoyer"
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Recherche et e-mail
+        # Champs passés en variables d'environnement, jamais interpolés dans le script (injection).
+        env:
+          SEARCH_DESTINATION: ${{ inputs.destination }}
+          SEARCH_ORIGINS: ${{ inputs.origins }}
+          SEARCH_DEPART_FROM: ${{ inputs.depart_from }}
+          SEARCH_DEPART_TO: ${{ inputs.depart_to }}
+          SEARCH_RETURN_DATE: ${{ inputs.return_date }}
+          SEARCH_STAY_DAYS: ${{ inputs.stay_days }}
+          SEARCH_PASSENGERS: ${{ inputs.passengers }}
+          SEARCH_CABIN: ${{ inputs.cabin }}
+          SEARCH_MAX_STOPS: ${{ inputs.max_stops }}
+          SEARCH_LAYOVER_MIN_HOURS: ${{ inputs.layover_min_hours }}
+          SEARCH_LAYOVER_MAX_HOURS: ${{ inputs.layover_max_hours }}
+          SEARCH_NO_AIRPORT_CHANGE: ${{ inputs.no_airport_change }}
+          SEARCH_CHECKED_BAG: ${{ inputs.checked_bag }}
+          SEARCH_MAX_DURATION_HOURS: ${{ inputs.max_duration_hours }}
+          SEARCH_EXCLUDED_AIRLINES: ${{ inputs.excluded_airlines }}
+          SEARCH_ALERT_BELOW: ${{ inputs.alert_below }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: python -m tracker.adhoc
+      - name: E-mail généré
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: email
+          path: out/email.html
+          if-no-files-found: ignore
+          retention-days: 7

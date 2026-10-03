@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .models import Quote
 
-QUOTE_FIELDS = [f.name for f in fields(Quote) if f.name != "history"]
+QUOTE_FIELDS = [f.name for f in fields(Quote) if f.name not in ("history", "layovers")]
 BASELINE_FIELDS = ["search", "source", "origin", "dest", "depart_date", "return_date", "found_at", "price"]
 INT_FIELDS = {"stops", "duration_min"}
 FLOAT_FIELDS = {"price", "typical_low", "typical_high"}

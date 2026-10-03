@@ -30,9 +30,10 @@ def test_unknown_destination_explains_how_to_fix():
 
 def test_example_config_is_valid():
     s = load_config("config.yaml").searches[0]
-    assert s.origin_airports == ["BCN", "MRS"]
-    assert s.origin_city == {"BCN": "Barcelone", "MRS": "Marseille"}
-    assert s.stay_days == [10, 14, 21] and s.alert_below == 700
+    assert s.origin_airports == ["BCN", "CDG", "ORY", "MRS", "LYS", "NCE", "TLS"]
+    assert s.origin_city["ORY"] == "Paris"
+    assert (s.depart_from.isoformat(), s.depart_to.isoformat(), s.return_date.isoformat()) == ("2027-05-05", "2027-05-05", "2027-05-22")
+    assert s.max_stops == 2 and s.layover_hours == (3, 6) and s.no_airport_change
 
 
 @pytest.mark.parametrize("override, message", [
@@ -55,3 +56,21 @@ def test_filters(make_search):
     assert not passes_filters(s, 0, 900, "SU")
     assert not passes_filters(s, 0, 900, "Air France + Aeroflot")
     assert passes_filters(s, 0, 900, "Lufthansa")  # « SU » ne doit pas matcher par sous-chaîne
+
+
+@pytest.mark.parametrize("value", [[6, 3], [3], "3-6", [-1, 2]])
+def test_invalid_layover_hours_are_rejected(make_search, value):
+    with pytest.raises(ValueError, match="layover_hours"):
+        make_search(layover_hours=value)
+
+
+def test_layover_filters(make_search):
+    s = make_search(layover_hours=[3, 6], no_airport_change=True)
+    assert s.layover_hours == (3.0, 6.0)
+    assert passes_filters(s, 0, 800, "AF", [])
+    assert passes_filters(s, 1, 900, "AF", [(180, "HKG", "HKG")])
+    assert not passes_filters(s, 1, 900, "AF", [(179, "HKG", "HKG")])
+    assert not passes_filters(s, 2, 900, "AF", [(200, "HKG", "HKG"), (361, "DOH", "DOH")])
+    assert not passes_filters(s, 1, 900, "AF", [(240, "CDG", "ORY")])
+    assert not passes_filters(s, 1, 900, "AF", None)  # escales non détaillées
+    assert passes_filters(make_search(), 1, 900, "AF", None)  # sans critère d'escale, rien à vérifier

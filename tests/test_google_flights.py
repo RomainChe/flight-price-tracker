@@ -1,8 +1,11 @@
+import base64
 import json
+from types import SimpleNamespace
 from datetime import date
 
 import pytest
 from conftest import quote
+from fast_flights.pb.flights_pb2 import Info
 
 from tracker.models import Context
 from tracker.sources import google_flights as g
@@ -11,8 +14,10 @@ TODAY = date(2027, 1, 10)
 
 
 def page(items_best, items_other=(), insight=True):
-    def item(price, airlines, stops, minutes):
-        return [["XX", airlines, [None] * (stops + 1), None, None, None, None, None, None, minutes], [[None, price]]]
+    def item(price, airlines, stops, minutes, layovers=None):
+        f = ["XX", airlines, [None] * (stops + 1), None, None, None, None, None, None, minutes, None, None, None,
+             [[m, a, d] for m, a, d in layovers or []]]
+        return [f, [[None, price]]]
     payload = [None] * 24
     payload[2] = [[item(*i) for i in items_best]] if items_best else None
     payload[3] = [[item(*i) for i in items_other]]
@@ -24,10 +29,12 @@ def page(items_best, items_other=(), insight=True):
 
 
 def test_parse_reads_best_and_other_flights_and_price_insight():
-    flights, insight = g.parse(page([(790, ["Swiss"], 1, 895)], [(1138, ["Qatar Airways", "JAL"], 2, 1300)]))
+    flights, insight = g.parse(page([(790, ["Swiss"], 1, 895, [(265, "ZRH", "ZRH")])],
+                                    [(1138, ["Qatar Airways", "JAL"], 2, 1300), (900, ["AF"], 0, 800)]))
     assert flights == [
-        {"price": 790, "airlines": "Swiss", "stops": 1, "duration_min": 895},
-        {"price": 1138, "airlines": "Qatar Airways; JAL", "stops": 2, "duration_min": 1300},
+        {"price": 790, "airlines": "Swiss", "stops": 1, "duration_min": 895, "layovers": [(265, "ZRH", "ZRH")]},
+        {"price": 1138, "airlines": "Qatar Airways; JAL", "stops": 2, "duration_min": 1300, "layovers": None},
+        {"price": 900, "airlines": "AF", "stops": 0, "duration_min": 800, "layovers": []},
     ]
     assert insight["low"] == 720 and insight["high"] == 1000
     assert insight["history"][0] == ("2026-08-03", 683)
@@ -50,6 +57,11 @@ def test_history_dates_do_not_depend_on_machine_timezone():
 def test_parse_consent_page_raises():
     with pytest.raises(ValueError, match="consentement"):
         g.parse("<html><title>Avant de continuer</title></html>")
+
+
+def test_layover_text():
+    assert g.layover_text([(265, "HKG", "HKG"), (185, "CDG", "ORY")]) == "HKG 4 h 25, CDG 3 h 05 (→ ORY)"
+    assert g.layover_text(None) == ""
 
 
 def test_level():
@@ -102,3 +114,32 @@ def test_collect_stops_when_blocked_and_raises_if_nothing(search):
     ctx = Context("2027-01-10", google_budget=50, google_pause=(0, 0))
     with pytest.raises(RuntimeError, match="arrêt après 5 échecs"):
         g.collect(search, ctx, fetch=blocked, sleep=lambda _: None)
+
+
+def test_collect_keeps_only_layovers_within_hours_in_same_airport(make_search):
+    s = make_search(depart_to="2027-05-01", destination_airports=["NRT"], layover_hours=[3, 6], no_airport_change=True)
+    flights = [
+        {"price": 700, "airlines": "A", "stops": 1, "duration_min": 900, "layovers": [(70, "TPE", "TPE")]},  # trop court
+        {"price": 750, "airlines": "B", "stops": 1, "duration_min": 900, "layovers": [(240, "CDG", "ORY")]},  # change d'aéroport
+        {"price": 800, "airlines": "C", "stops": 2, "duration_min": 900, "layovers": [(200, "HEL", "HEL"), (400, "DOH", "DOH")]},
+        {"price": 850, "airlines": "D", "stops": 1, "duration_min": 900, "layovers": None},  # non vérifiable
+        {"price": 900, "airlines": "E", "stops": 1, "duration_min": 900, "layovers": [(265, "HKG", "HKG")]},
+    ]
+    seen = []
+
+    def fake_fetch(client, search, probe):
+        seen.append(probe)
+        return (flights, None, "https://g") if probe[0] == "rt" else ([], None, "https://g")
+    quotes, _ = g.collect(s, Context("2027-01-10", google_budget=4, google_pause=(0, 0)), fetch=fake_fetch, sleep=lambda _: None)
+    assert {(q.price, q.airlines, q.layovers) for q in quotes} == {(900, "E", "aller : HKG 4 h 25")}
+
+
+def test_fetch_sends_layover_filter_on_both_legs(make_search):
+    class FakeClient:
+        def get(self, url, params, cookies):
+            self.params = params
+            return SimpleNamespace(text=page([(900, ["E"], 0, 800)]))
+    client = FakeClient()
+    g.fetch(client, make_search(layover_hours=[3, 6]), ("rt", "BCN", "NRT", "2027-05-05", "2027-05-22"))
+    info = Info.FromString(base64.b64decode(client.params["tfs"]))
+    assert [(d.min_layover_minutes, d.max_layover_minutes) for d in info.data] == [(180, 360), (180, 360)]

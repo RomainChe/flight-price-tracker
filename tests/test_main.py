@@ -65,3 +65,13 @@ def test_invalid_config_raises_value_error(tmp_path):
     cfg.write_text(CONFIG.replace("Barcelone", "Madrid"), encoding="utf-8")
     with pytest.raises(ValueError, match="Madrid"):
         run(cfg, dry_run=True, env={}, data_dir=tmp_path, out_file=tmp_path / "e.html")
+
+
+def test_one_off_search_neither_reads_nor_writes_history(setup, monkeypatch):
+    cfg, tmp, kw = setup
+    sent = []
+    monkeypatch.setattr("tracker.report.send_email", lambda html, subject, *a: sent.append(subject))
+    env = {"GMAIL_USER": "u", "GMAIL_APP_PASSWORD": "p", "MAIL_TO": "a@x.fr"}
+    run(cfg, dry_run=False, env=env, today=date(2027, 1, 10), keep_history=False, **kw)
+    assert not (tmp / "data").exists()
+    assert sent and "680" in sent[0]

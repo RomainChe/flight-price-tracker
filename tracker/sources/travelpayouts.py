@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from ..airports import tp_city
-from ..config import passes_filters
+from ..config import checks_layovers, passes_filters
 from ..models import Leg, Quote, combine_one_ways, date_pairs, matches_stay
 
 NAME = "Aviasales / Travelpayouts"
@@ -51,7 +51,7 @@ def collect(search, ctx, get=get, sleep=time.sleep):
     requests += [(d, o, m, "true") for o in o_cities for d in d_cities for m in ret_months]
 
     quotes, outs, backs = [], [], []
-    errors, last_error = 0, ""
+    errors, last_error, unverified = 0, "", 0
     for i, (origin, dest, month, one_way) in enumerate(requests):
         if i:
             sleep(PAUSE_SECONDS)
@@ -64,6 +64,9 @@ def collect(search, ctx, get=get, sleep=time.sleep):
         for r in rows:
             a, b = r.get("origin_airport") or r.get("origin"), r.get("destination_airport") or r.get("destination")
             airline, stops, minutes = r.get("airline", ""), r.get("transfers"), r.get("duration_to") or r.get("duration")
+            if stops and checks_layovers(search):
+                unverified += 1  # le cache ne détaille pas les escales
+                continue
             if not r.get("price") or not passes_filters(search, stops, minutes, airline):
                 continue
             link = SITE + r["link"] if r.get("link") else ""
@@ -82,6 +85,8 @@ def collect(search, ctx, get=get, sleep=time.sleep):
     quotes += combine_one_ways(search, outs, backs, ctx.run_date, STAY_TOLERANCE_DAYS)
 
     note = f"{len(requests) - errors}/{len(requests)} requêtes réussies, données du cache (peuvent dater de quelques jours)"
+    if unverified:
+        note += f" ; {unverified} prix avec escale(s) écartés : le cache ne donne ni la durée ni les aéroports des escales"
     if errors:
         note += f" (dernière erreur : {last_error[:120]})"
     if errors == len(requests):

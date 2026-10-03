@@ -48,9 +48,11 @@ def parse(html: str) -> tuple[list[dict], dict | None]:
             except (IndexError, TypeError):  # vol affiché sans prix
                 continue
             if price:
+                stops = len(f[2]) - 1
+                layovers = [(l[0], l[1], l[2]) for l in (f[13] if len(f) > 13 else None) or []]
                 flights.append({
-                    "price": price, "airlines": "; ".join(f[1] or []),
-                    "stops": len(f[2]) - 1, "duration_min": f[9],
+                    "price": price, "airlines": "; ".join(f[1] or []), "stops": stops, "duration_min": f[9],
+                    "layovers": layovers if layovers or not stops else None,  # None : escales non détaillées
                 })
     insight = None
     s = payload[5] if len(payload) > 5 else None
@@ -61,6 +63,10 @@ def parse(html: str) -> tuple[list[dict], dict | None]:
             "history": [(_day(ts), p) for ts, p in history],
         }
     return flights, insight
+
+
+def layover_text(layovers) -> str:
+    return ", ".join(f"{arr} {m // 60} h {m % 60:02d}" + (f" (→ {dep})" if dep != arr else "") for m, arr, dep in layovers or [])
 
 
 def level(price: float, low: float, high: float) -> str:
@@ -107,8 +113,11 @@ def fetch(client, search, probe) -> tuple[list[dict], dict | None, str]:
         _, a, b, day = probe
         legs, trip = [(a, b, day)], "one-way"
     # Durée max filtrée après coup : envoyée à Google, elle supprime l'indicateur de prix.
+    # Durée d'escale envoyée à Google (s'applique aussi au retour, qu'on ne voit pas) et revérifiée après coup.
+    lo, hi = (round(h * 60) for h in search.layover_hours) if search.layover_hours else (None, None)
     query = create_query(
-        flights=[FlightQuery(date=day, from_airport=a, to_airport=b) for a, b, day in legs],
+        flights=[FlightQuery(date=day, from_airport=a, to_airport=b, min_layover_minutes=lo, max_layover_minutes=hi)
+                 for a, b, day in legs],
         trip=trip, seat=search.cabin, passengers=Passengers(adults=search.passengers),
         currency=search.currency, language="fr", max_stops=search.max_stops,
         checked_bags=1 if search.checked_bag else 0,
@@ -139,13 +148,15 @@ def collect(search, ctx, fetch=fetch, sleep=time.sleep):
             continue
         finally:
             done += 1
-        flights = [f for f in flights if passes_filters(search, f["stops"], f["duration_min"], f["airlines"])]
+        flights = [f for f in flights
+                   if passes_filters(search, f["stops"], f["duration_min"], f["airlines"], f.get("layovers"))]
         if not flights:
             continue
         best = min(flights, key=lambda f: f["price"])
         price = round(best["price"] / pax, 2)
         if probe[0] == "ow":
-            leg = Leg(NAME, probe[1], probe[2], probe[3], price, best["airlines"], best["stops"], best["duration_min"], url)
+            leg = Leg(NAME, probe[1], probe[2], probe[3], price, best["airlines"], best["stops"], best["duration_min"], url,
+                      layover_text(best.get("layovers")))
             (outs if probe[1] in search.origin_airports else backs).append(leg)
             continue
         _, o, d, dep, ret = probe
@@ -154,6 +165,8 @@ def collect(search, ctx, fetch=fetch, sleep=time.sleep):
             origin=o, dest=d, return_from=d, return_to=o, depart_date=dep, return_date=ret, price=price,
             airlines=best["airlines"], stops=best["stops"], duration_min=best["duration_min"], link=url,
         )
+        if best.get("layovers"):
+            quote.layovers = f"aller : {layover_text(best['layovers'])}"
         if insight:
             quote.typical_low, quote.typical_high = round(insight["low"] / pax, 2), round(insight["high"] / pax, 2)
             quote.price_level = level(quote.price, quote.typical_low, quote.typical_high)

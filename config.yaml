@@ -15,19 +15,21 @@ defaults:
   currency: EUR
 
 searches:
-  - name: Japon mai 2027
+  - name: Japon 5-22 mai 2027
     # Départs : Barcelone ou aéroports en France, par nom de ville ou code IATA (Paris = CDG + ORY).
-    origins: [Barcelone, Marseille]
+    # Le retour peut se faire vers n'importe laquelle de ces villes.
+    origins: [Barcelone, Paris, Marseille, Lyon, Nice, Toulouse]
     # Ville (Tokyo), pays (Japon) ou code IATA. Pour un pays, tous ses aéroports internationaux
     # sont essayés à l'aller comme au retour (open-jaw compris).
     destination: Japon
     # destination_airports: [NRT, HND, KIX]   # pour forcer une liste d'aéroports
-    depart_from: 2027-05-01
-    depart_to: 2027-05-31
-    stay_days: [10, 14, 21]
-    # return_date: 2027-05-25                 # à la place de stay_days pour une date de retour fixe
-    max_stops: 1
-    max_duration_hours: 20                    # durée max de l'aller
+    depart_from: 2027-05-05                   # même jour que depart_to : date de départ fixe
+    depart_to: 2027-05-05
+    return_date: 2027-05-22                   # date de retour fixe (sinon stay_days: [10, 14, 21])
+    max_stops: 2
+    layover_hours: [3, 6]                     # chaque escale entre 3 h et 6 h
+    no_airport_change: true                   # arrivée et départ de l'escale dans le même aéroport
+    # max_duration_hours: 30                  # durée max de l'aller
     checked_bag: false                        # true : Google inclut l'estimation du bagage en soute
     excluded_airlines: []                     # nom (Google) et/ou code IATA (Travelpayouts), ex. [Aeroflot, SU]
     alert_below: 700                          # alerte si le meilleur prix par personne passe sous ce seuil

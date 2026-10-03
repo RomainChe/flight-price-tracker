@@ -10,7 +10,9 @@ Chaque matin, GitHub Actions :
 4. donne une recommandation **ACHETER / ATTENDRE / SURVEILLER**, avec un niveau de confiance et une fenêtre d'achat estimée ;
 5. t'envoie un récapitulatif HTML par e-mail.
 
-Exemple fourni : départ de Barcelone ou Marseille, vers n'importe quel aéroport international du Japon, en mai 2027.
+Suivi configuré : voyage au Japon du 5 au 22 mai 2027, au départ de Barcelone, Paris, Marseille, Lyon, Nice ou Toulouse. Le projet compare tous les aéroports internationaux japonais, avec 2 escales au maximum, chacune de 3 à 6 h et sans changer d'aéroport.
+
+Un second workflow, **Recherche ponctuelle**, lance une recherche unique sur n'importe quelle destination, avec des critères saisis dans un formulaire.
 
 ## Sources de prix
 
@@ -47,7 +49,7 @@ Pour un essai local avec les vrais identifiants, renseigne les variables de `.en
 
 1. Crée un compte sur [travelpayouts.com](https://www.travelpayouts.com/).
 2. Rejoins le programme **Aviasales**, sans frais.
-3. Copie ton token API depuis [Profil → API token](https://www.travelpayouts.com/developers/api).
+3. Dans ton **Profil**, onglet **API token**, copie le token ([aide Travelpayouts](https://support.travelpayouts.com/hc/en-us/articles/13024069738386-Where-to-find-API-token)). N'utilise « Update token » que si le token a fuité : l'ancien cesse aussitôt de fonctionner.
 
 ## Créer le mot de passe d'application Gmail
 
@@ -77,11 +79,19 @@ Tout se règle dans [`config.yaml`](config.yaml), sans toucher au code.
 - `destination` : une ville (`Tokyo`), un pays (`Japon`) ou un code IATA. Pour un pays, tous ses aéroports internationaux sont essayés, y compris en open-jaw (par exemple arrivée à Tokyo, retour depuis Osaka). Le retour peut se faire vers n'importe quelle ville de départ. Pour un pays absent de la table, ajoute `destination_airports: [CODE, ...]`.
 - `depart_from` / `depart_to`, plus `stay_days` (par exemple `[10, 14, 21]`) ou une `return_date` fixe.
 - `passengers`, `cabin`, `currency`, `max_stops`, `max_duration_hours`, `checked_bag`, `excluded_airlines`, `alert_below`.
+- `layover_hours: [3, 6]` : durée de chaque escale, en heures. `no_airport_change: true` : arrivée et départ de l'escale dans le même aéroport. Ces deux critères sont envoyés à Google, puis revérifiés sur l'aller. Les prix Travelpayouts avec escale sont alors écartés, car son cache ne détaille pas les escales.
 - Pour suivre plusieurs recherches en parallèle, ajoute des entrées sous `searches`. Le budget Google se partage entre elles.
 
 ## Lancer manuellement
 
-Dans **Actions → Suivi quotidien des prix → Run workflow**. Coche « dry_run » pour seulement générer l'e-mail : il est alors téléchargeable dans les artefacts du run.
+Deux workflows, dans l'onglet **Actions** :
+
+- **Suivi quotidien (config.yaml)** : la recherche de `config.yaml`, lancée chaque matin, ou à la main avec **Run workflow**.
+  - Coche « Générer l'e-mail sans l'envoyer » pour un dry-run : l'e-mail est alors téléchargeable dans les artefacts du run.
+  - Coche « Afficher dans les logs la réponse brute de l'API Travelpayouts » pour un diagnostic. Le token n'est jamais affiché.
+- **Recherche ponctuelle** : un formulaire où tu saisis la destination, les villes de départ, les dates (période de départ, plus une date de retour fixe ou des durées de séjour), les passagers, la classe, les escales (nombre, durée min et max, sans changement d'aéroport), le bagage en soute, la durée max, les compagnies exclues et le seuil d'alerte.
+  - Le run envoie l'e-mail, sans toucher à l'historique ni à `config.yaml`.
+  - La règle « départ de Barcelone ou de France » s'applique aussi.
 
 Le cron tourne à 6 h UTC, soit 8 h à Paris l'été et 7 h l'hiver. GitHub n'exécute les crons que sur la **branche par défaut** du dépôt.
 
@@ -90,7 +100,7 @@ Le cron tourne à 6 h UTC, soit 8 h à Paris l'été et 7 h l'hiver. GitHub n'ex
 - **Google Flights n'a pas d'API officielle.** fast-flights lit la page publique, qui peut changer ou bloquer les requêtes. Le projet s'arrête alors proprement après 5 échecs de suite et l'e-mail le signale. Pour rester discret, il fait 150 requêtes par jour au maximum, avec 2 à 5 s de pause entre chaque.
 - **Les open-jaw sont composés de deux allers simples**, soit deux billets séparés : Google ne fournit pas les résultats multi-destinations dans sa page, et Travelpayouts ne les a pas en cache. Un vrai billet open-jaw peut coûter moins cher.
 - **Tout n'est pas interrogé chaque jour** : il y a plus de 2 000 combinaisons. Le projet re-vérifie d'abord les 20 moins chères de la veille, puis interroge un échantillon qui change chaque jour, si bien que toutes les dates finissent par être couvertes.
-- **Pour un aller-retour Google**, la compagnie, les escales et la durée affichées sont celles de l'aller.
+- **Pour un aller-retour Google**, la compagnie, les escales et la durée affichées sont celles de l'aller. Le critère de durée d'escale est envoyé à Google pour les deux trajets, mais seul l'aller peut être revérifié, notamment pour l'absence de changement d'aéroport.
 - **Travelpayouts sert des prix en cache**, qui peuvent dater de quelques jours. Sa base ne couvre que la classe économique. Comme le cache contient des séjours de toutes durées, il accepte un écart de ±2 jours par rapport à `stay_days`, et l'e-mail affiche la durée réelle.
 - **Historique de l'an dernier** : le projet le demande à Travelpayouts, depuis Barcelone, Paris et les villes de départ configurées. Je n'ai pas trouvé de jeu de données public et gratuit fiable pour l'Europe → Asie. Faute de données, l'e-mail le dit et la recommandation s'appuie sur les règles générales du secteur.
 - **Les règles de la recommandation sont un barème simple** : achat long-courrier 6 à 2 mois avant le départ, 8 à 4 mois en haute saison (Golden Week, ponts français). Elles se basent aussi sur la position du prix et la tendance. La confiance augmente avec les jours d'historique accumulés.

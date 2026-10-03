@@ -24,6 +24,7 @@ class Quote:
     typical_low: float | None = None
     typical_high: float | None = None
     history: list = field(default_factory=list, repr=False, compare=False)  # non stocké
+    layovers: str = field(default="", compare=False)  # détail affiché dans l'e-mail, non stocké
 
     @property
     def combo(self) -> tuple:
@@ -57,6 +58,7 @@ class Leg:
     stops: int | None = None
     duration_min: int | None = None
     link: str = ""
+    layovers: str = ""
 
 
 def date_pairs(search, today: date | None = None) -> list[tuple[str, str]]:
@@ -110,6 +112,7 @@ def combine_one_ways(search, outs: list[Leg], backs: list[Leg], run_date: str, t
                 airlines=" + ".join(dict.fromkeys(a for a in (out.airlines, back.airlines) if a)),
                 stops=out.stops, duration_min=out.duration_min,
                 link=" | ".join(x for x in (out.link, back.link) if x),
+                layovers=" · ".join(f"{label} : {leg.layovers}" for label, leg in (("aller", out), ("retour", back)) if leg.layovers),
             ))
     return quotes
 

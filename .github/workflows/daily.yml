@@ -1,4 +1,4 @@
-name: Suivi quotidien des prix
+name: Suivi quotidien (config.yaml)
 
 on:
   schedule:

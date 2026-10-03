@@ -14,12 +14,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def run(config_path, dry_run: bool, env=os.environ, today: date | None = None, sources=SOURCES,
-        data_dir: Path = ROOT / "data", out_file: Path = ROOT / "out" / "email.html", fetch_baseline=travelpayouts.baseline):
+        data_dir: Path = ROOT / "data", out_file: Path = ROOT / "out" / "email.html", fetch_baseline=travelpayouts.baseline,
+        keep_history: bool = True):
+    """keep_history=False : recherche ponctuelle, l'historique n'est ni lu ni modifié."""
     cfg = load_config(config_path)
+    store = keep_history and not dry_run
     run_date = (today or date.today()).isoformat()
     quotes_path, baseline_path = data_dir / "prices.csv", data_dir / "baseline.csv"
-    history = storage.load_quotes(quotes_path)
-    baseline = storage.load_baseline(baseline_path)
+    history = storage.load_quotes(quotes_path) if keep_history else []
+    baseline = storage.load_baseline(baseline_path) if keep_history else []
     token = env.get("TRAVELPAYOUTS_TOKEN", "")
     budget = max(1, cfg.google_max_requests // len(cfg.searches))
     several = len(cfg.searches) > 1
@@ -46,12 +49,12 @@ def run(config_path, dry_run: bool, env=os.environ, today: date | None = None, s
             try:
                 search_baseline = fetch_baseline(search, token)
                 statuses.append((f"Historique de l'an dernier ({search.name})", True, f"{len(search_baseline)} prix récupérés"))
-                if not dry_run:
+                if store:
                     storage.append_baseline(baseline_path, search_baseline)
             except Exception as e:
                 statuses.append((f"Historique de l'an dernier ({search.name})", False, str(e)))
 
-        if not dry_run:
+        if store:
             storage.append_quotes(quotes_path, today_quotes)
         a = analysis.analyze(search, today_quotes, mine + today_quotes, run_date)
         advice = expert.recommend(search, a, search_baseline, date.fromisoformat(run_date))

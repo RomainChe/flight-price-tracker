@@ -31,6 +31,8 @@ class Search:
     checked_bag: bool = False
     excluded_airlines: list[str] = field(default_factory=list)
     alert_below: float | None = None
+    layover_hours: tuple[float, float] | None = None  # durée de chaque escale, en heures (min, max)
+    no_airport_change: bool = False  # escale dans le même aéroport à l'arrivée et au départ
 
 
 @dataclass
@@ -82,6 +84,14 @@ def _search(raw: dict, defaults: dict) -> Search:
     passengers = int(raw.get("passengers", 1))
     if not 1 <= passengers <= 9:
         raise ValueError(f"{name} : de 1 à 9 passagers.")
+    layover = raw.get("layover_hours")
+    if layover is not None:
+        try:
+            layover = (float(layover[0]), float(layover[1]))
+        except (TypeError, ValueError, IndexError):
+            raise ValueError(f"{name} : `layover_hours` attend [min, max] en heures, ex. [3, 6].") from None
+        if not 0 <= layover[0] <= layover[1]:
+            raise ValueError(f"{name} : `layover_hours` : le minimum doit être positif et inférieur au maximum.")
 
     return Search(
         name=name, origins=[str(o) for o in origins], origin_airports=list(origin_city), origin_city=origin_city,
@@ -91,7 +101,8 @@ def _search(raw: dict, defaults: dict) -> Search:
         max_stops=raw.get("max_stops"), max_duration_hours=raw.get("max_duration_hours"),
         checked_bag=bool(raw.get("checked_bag", False)),
         excluded_airlines=[str(a) for a in raw.get("excluded_airlines") or []],
-        alert_below=raw.get("alert_below"),
+        alert_below=raw.get("alert_below"), layover_hours=layover,
+        no_airport_change=bool(raw.get("no_airport_change", False)),
     )
 
 
@@ -120,9 +131,22 @@ def airline_excluded(search: Search, airlines: str) -> bool:
     return any(a.strip().lower() in tokens for a in search.excluded_airlines)
 
 
-def passes_filters(search: Search, stops, duration_min, airlines) -> bool:
+def checks_layovers(search: Search) -> bool:
+    return bool(search.layover_hours or search.no_airport_change)
+
+
+def passes_filters(search: Search, stops, duration_min, airlines, layovers=None) -> bool:
+    """`layovers` : [(minutes, aéroport d'arrivée, aéroport de départ)], None si la source ne les donne pas."""
     if search.max_stops is not None and stops is not None and stops > search.max_stops:
         return False
     if search.max_duration_hours and duration_min and duration_min > search.max_duration_hours * 60:
         return False
+    if stops and checks_layovers(search):
+        if layovers is None:  # escales non vérifiables : on écarte plutôt que d'afficher une offre hors critères
+            return False
+        for minutes, arrival, departure in layovers:
+            if search.layover_hours and not search.layover_hours[0] * 60 <= minutes <= search.layover_hours[1] * 60:
+                return False
+            if search.no_airport_change and arrival != departure:
+                return False
     return not airline_excluded(search, airlines)

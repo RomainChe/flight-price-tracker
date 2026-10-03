@@ -39,7 +39,8 @@ def _offer(q) -> str:
         f"<div>{escape(route)}</div>"
         f'<div style="{MUTED}">{fr_date(q.depart_date)} → {fr_date(q.return_date)} ({q.stay_days} j) · '
         f"{escape(q.airlines or 'compagnie non précisée')} · {stops}{hours}</div>"
-        f'<div style="{MUTED}">{escape(q.kind)} · {escape(q.source)}</div>'
+        + (f'<div style="{MUTED}">Escales {escape(q.layovers)}</div>' if q.layovers else "")
+        + f'<div style="{MUTED}">{escape(q.kind)} · {escape(q.source)}</div>'
         f'<div style="font-size:14px;margin-top:4px">{_links(q)}</div></div>'
     )
 
@@ -58,6 +59,29 @@ def _bars(points: list[tuple[str, float]], title: str) -> str:
         )
     return (f'<h3 style="font-size:15px;margin:12px 0 6px">{escape(title)}</h3>'
             f'<table role="presentation" style="width:100%;border-collapse:collapse">{"".join(rows)}</table>')
+
+
+def criteria(search) -> str:
+    if search.depart_from == search.depart_to:
+        dates = f"départ le {fr_date(search.depart_from.isoformat())}"
+    else:
+        dates = f"départ du {fr_date(search.depart_from.isoformat())} au {fr_date(search.depart_to.isoformat())}"
+    dates += (f", retour le {fr_date(search.return_date.isoformat())}" if search.return_date
+              else f", séjour de {', '.join(map(str, search.stay_days))} jours")
+    parts = [dates, f"{search.passengers} passager(s), {search.cabin}"]
+    if search.max_stops is not None:
+        parts.append("vol direct" if search.max_stops == 0 else f"{search.max_stops} escale(s) max")
+    if search.layover_hours:
+        parts.append(f"escales de {search.layover_hours[0]:g} à {search.layover_hours[1]:g} h")
+    if search.no_airport_change:
+        parts.append("sans changement d'aéroport")
+    if search.max_duration_hours:
+        parts.append(f"{search.max_duration_hours:g} h de trajet max")
+    if search.checked_bag:
+        parts.append("bagage en soute inclus (Google)")
+    if search.excluded_airlines:
+        parts.append(f"sans {', '.join(search.excluded_airlines)}")
+    return " · ".join(parts)
 
 
 def section(search, a: dict, advice: dict) -> str:
@@ -95,6 +119,7 @@ def section(search, a: dict, advice: dict) -> str:
     return f"""
 <div style="{CARD}">
   <h2 style="font-size:18px;margin:0 0 6px">{escape(title)}</h2>
+  <p style="{MUTED};margin:0 0 6px">{escape(criteria(search))}</p>
   {alerts}
   <p style="margin:6px 0"><span style="background:{color};color:#fff;padding:4px 10px;border-radius:4px;font-weight:bold">{advice['decision']}</span>
   <span style="{MUTED}"> confiance {escape(advice['confidence'])}</span></p>
@@ -138,10 +163,18 @@ def build_email(run_date: str, sections: list[str], statuses: list[tuple[str, bo
 
 
 def send_email(html: str, subject: str, user: str, password: str, recipients: list[str]):
+    # Google affiche le mot de passe d'application en 4 groupes : espaces et retours à la ligne retirés.
+    user, password = user.strip(), "".join(password.split())
     msg = EmailMessage()
     msg["Subject"], msg["From"], msg["To"] = subject, user, ", ".join(recipients)
     msg.set_content("Ce récapitulatif est au format HTML.")
     msg.add_alternative(html, subtype="html")
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=60) as smtp:
-        smtp.login(user, password)
+        try:
+            smtp.login(user, password)
+        except (smtplib.SMTPAuthenticationError, smtplib.SMTPServerDisconnected) as e:
+            raise SystemExit(
+                f"Gmail a refusé la connexion ({type(e).__name__}) : vérifie que GMAIL_USER est l'adresse du compte "
+                "qui a créé le mot de passe d'application, et que GMAIL_APP_PASSWORD contient ses 16 lettres."
+            ) from e
         smtp.send_message(msg)
