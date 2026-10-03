@@ -40,6 +40,13 @@ def test_parse_without_insight_skips_flights_without_price():
     assert [f["price"] for f in g.parse(html_ok)[0]] == [950]
 
 
+def test_history_dates_do_not_depend_on_machine_timezone():
+    # minuit à Paris (UTC+2) et minuit à Tokyo (UTC+9) le 3 août 2026, soit la veille en UTC
+    html = page([(790, ["Swiss"], 1, 895)]).replace("[1785708000000, 683]", "[1785708000000, 683], [1785682800000, 683]")
+    _, insight = g.parse(html)
+    assert [d for d, _ in insight["history"][:2]] == ["2026-08-03", "2026-08-03"]
+
+
 def test_parse_consent_page_raises():
     with pytest.raises(ValueError, match="consentement"):
         g.parse("<html><title>Avant de continuer</title></html>")

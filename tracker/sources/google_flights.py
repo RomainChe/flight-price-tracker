@@ -8,7 +8,7 @@ avec deux allers simples.
 import json
 import random
 import time
-from datetime import date
+from datetime import UTC, date, datetime
 
 from fast_flights import FlightQuery, Passengers, create_query
 from primp import Client
@@ -24,6 +24,11 @@ COOKIES = {"SOCS": "CAESHAgBEhJnd3NfMjAyMzA4MTAtMF9SQzIaAmZyIAEaBgiAo_CmBg"}
 MAX_CONSECUTIVE_ERRORS = 5
 SEEDS = 20  # combinaisons les moins chères de la veille re-vérifiées en priorité
 OPEN_JAW_DATE_PAIRS = 1  # 2 x départs x aéroports requêtes par paire de dates
+
+
+def _day(ms: int) -> str:
+    """Horodatage Google (minuit dans un fuseau local) -> jour, quel que soit le fuseau de la machine."""
+    return datetime.fromtimestamp(ms / 1000 + 12 * 3600, UTC).date().isoformat()
 
 
 def parse(html: str) -> tuple[list[dict], dict | None]:
@@ -53,7 +58,7 @@ def parse(html: str) -> tuple[list[dict], dict | None]:
         history = s[10][0] if len(s) > 10 and s[10] else []
         insight = {
             "low": s[4][1], "high": s[5][1],
-            "history": [(date.fromtimestamp(ts / 1000).isoformat(), p) for ts, p in history],
+            "history": [(_day(ts), p) for ts, p in history],
         }
     return flights, insight
 
