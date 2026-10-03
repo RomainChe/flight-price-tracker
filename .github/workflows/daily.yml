@@ -9,6 +9,10 @@ on:
         description: "Générer l'e-mail sans l'envoyer (ni modifier l'historique)"
         type: boolean
         default: false
+      diagnostic:
+        description: "Afficher dans les logs la réponse brute de l'API Travelpayouts"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -29,6 +33,12 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python -m pytest -q
+      - name: Diagnostic Travelpayouts
+        if: inputs.diagnostic
+        continue-on-error: true
+        env:
+          TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+        run: python -m tracker.diagnose
       - name: Relevé, analyse et e-mail
         env:
           TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
