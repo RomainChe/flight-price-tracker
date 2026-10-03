@@ -73,9 +73,21 @@ def date_pairs(search, today: date | None = None) -> list[tuple[str, str]]:
     return pairs
 
 
-def combine_one_ways(search, outs: list[Leg], backs: list[Leg], run_date: str, kind="2 allers simples") -> list[Quote]:
+def matches_stay(search, dep: str, ret: str, tolerance: int = 0) -> bool:
+    """Le séjour dep -> ret correspond-il à la recherche, à `tolerance` jours près ?"""
+    if not dep or not ret:
+        return False
+    d, r = date.fromisoformat(dep), date.fromisoformat(ret)
+    if not search.depart_from <= d <= search.depart_to or r <= d:
+        return False
+    if search.return_date:
+        return abs((r - search.return_date).days) <= tolerance
+    return any(abs((r - d).days - n) <= tolerance for n in search.stay_days)
+
+
+def combine_one_ways(search, outs: list[Leg], backs: list[Leg], run_date: str, tolerance: int = 0,
+                     kind="2 allers simples") -> list[Quote]:
     """Assemble allers et retours simples en aller-retour (open-jaw compris), le moins cher par combinaison."""
-    wanted = set(date_pairs(search))
     best_out: dict = {}
     for leg in outs:
         key = (leg.origin, leg.dest, leg.date)
@@ -89,7 +101,7 @@ def combine_one_ways(search, outs: list[Leg], backs: list[Leg], run_date: str, k
     quotes = []
     for (o, d, dep), out in best_out.items():
         for (rf, rt, ret), back in best_back.items():
-            if (dep, ret) not in wanted or rf not in search.dest_airports or rt not in search.origin_airports:
+            if not matches_stay(search, dep, ret, tolerance) or rf not in search.dest_airports or rt not in search.origin_airports:
                 continue
             quotes.append(Quote(
                 run_date=run_date, search=search.name, source=out.source, kind=kind,

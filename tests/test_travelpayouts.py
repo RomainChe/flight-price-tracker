@@ -43,6 +43,24 @@ def test_collect_keeps_matching_round_trips_and_builds_open_jaws(make_search):
     assert "requêtes réussies" in note
 
 
+def test_cached_stays_close_to_wanted_duration_are_kept(make_search):
+    # Réponse réelle du cache : 13 j et 22 j pour des durées voulues de 14 et 21 j.
+    rows = [
+        {"origin_airport": "BCN", "destination_airport": "NRT", "price": 831, "airline": "ZH", "transfers": 1,
+         "departure_at": "2027-05-03T12:20:00+02:00", "return_at": "2027-05-16T19:00:00+09:00", "duration_to": 1040},
+        {"origin_airport": "BCN", "destination_airport": "HND", "price": 769, "airline": "CA", "transfers": 1,
+         "departure_at": "2027-05-02T12:30:00+02:00", "return_at": "2027-05-24T14:00:00+09:00", "duration_to": 895},
+        {"origin_airport": "BCN", "destination_airport": "NRT", "price": 500, "airline": "XX", "transfers": 1,
+         "departure_at": "2027-05-02T12:30:00+02:00", "return_at": "2027-05-30T14:00:00+09:00", "duration_to": 895},
+    ]
+
+    def get(path, params, token):
+        return rows if params["one_way"] == "false" and params["origin"] == "BCN" and params["destination"] == "TYO" else []
+    s = make_search(stay_days=[14, 21])
+    quotes, _ = tp.collect(s, Context("2027-01-10", token="t"), get=get, sleep=lambda _: None)
+    assert sorted((q.price, q.stay_days) for q in quotes) == [(769, 22), (831, 13)]  # 28 j : trop loin
+
+
 def test_collect_without_token_fails_clearly(search):
     with pytest.raises(RuntimeError, match="TRAVELPAYOUTS_TOKEN"):
         tp.collect(search, Context("2027-01-10"))

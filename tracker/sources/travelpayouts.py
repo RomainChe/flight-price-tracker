@@ -11,12 +11,14 @@ from urllib.request import Request, urlopen
 
 from ..airports import tp_city
 from ..config import passes_filters
-from ..models import Leg, Quote, combine_one_ways, date_pairs
+from ..models import Leg, Quote, combine_one_ways, date_pairs, matches_stay
 
 NAME = "Aviasales / Travelpayouts"
 API = "https://api.travelpayouts.com"
 SITE = "https://www.aviasales.com"
 PAUSE_SECONDS = 1.0
+# Le cache contient des séjours de toutes durées : on accepte un écart de quelques jours (durée réelle affichée).
+STAY_TOLERANCE_DAYS = 2
 
 
 def get(path: str, params: dict, token: str) -> list:
@@ -38,7 +40,6 @@ def collect(search, ctx, get=get, sleep=time.sleep):
     if search.cabin != "economy":
         return [], "ignorée : le cache Travelpayouts ne couvre que la classe économique"
     pairs = date_pairs(search, date.fromisoformat(ctx.run_date))
-    valid = set(pairs)
     dep_months = sorted({d[:7] for d, _ in pairs})
     ret_months = sorted({r[:7] for _, r in pairs})
     base = {"currency": search.currency.lower(), "sorting": "price", "limit": 1000, "unique": "false"}
@@ -69,7 +70,7 @@ def collect(search, ctx, get=get, sleep=time.sleep):
             dep = _day(r.get("departure_at"))
             if one_way == "false":
                 ret = _day(r.get("return_at"))
-                if (dep, ret) in valid and a in search.origin_airports and b in search.dest_airports:
+                if matches_stay(search, dep, ret, STAY_TOLERANCE_DAYS) and a in search.origin_airports and b in search.dest_airports:
                     quotes.append(Quote(
                         run_date=ctx.run_date, search=search.name, source=NAME, kind="aller-retour",
                         origin=a, dest=b, return_from=b, return_to=a, depart_date=dep, return_date=ret,
@@ -78,7 +79,7 @@ def collect(search, ctx, get=get, sleep=time.sleep):
             else:
                 (outs if a in search.origin_airports else backs).append(
                     Leg(NAME, a, b, dep, float(r["price"]), airline, stops, minutes, link))
-    quotes += combine_one_ways(search, outs, backs, ctx.run_date)
+    quotes += combine_one_ways(search, outs, backs, ctx.run_date, STAY_TOLERANCE_DAYS)
 
     note = f"{len(requests) - errors}/{len(requests)} requêtes réussies, données du cache (peuvent dater de quelques jours)"
     if errors:
