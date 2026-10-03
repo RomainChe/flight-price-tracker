@@ -1,0 +1,41 @@
+# Configuration du suivi des prix. Modifier ce fichier suffit : aucun code à toucher.
+# Les destinataires de l'e-mail ne sont PAS ici (dépôt public) : secret GitHub MAIL_TO.
+
+email:
+  subject: "Vols Japon"
+
+google:
+  max_requests: 150        # requêtes Google Flights par jour, réparties entre les recherches
+  pause_seconds: [2, 5]    # pause aléatoire entre deux requêtes
+
+# Valeurs communes à toutes les recherches (chaque recherche peut les surcharger).
+defaults:
+  passengers: 1
+  cabin: economy           # economy, premium-economy, business, first
+  currency: EUR
+
+searches:
+  - name: Japon mai 2027
+    # Départs : Barcelone ou aéroports en France, par nom de ville ou code IATA (Paris = CDG + ORY).
+    origins: [Barcelone, Marseille]
+    # Ville (Tokyo), pays (Japon) ou code IATA. Pour un pays, tous ses aéroports internationaux
+    # sont essayés à l'aller comme au retour (open-jaw compris).
+    destination: Japon
+    # destination_airports: [NRT, HND, KIX]   # pour forcer une liste d'aéroports
+    depart_from: 2027-05-01
+    depart_to: 2027-05-31
+    stay_days: [10, 14, 21]
+    # return_date: 2027-05-25                 # à la place de stay_days pour une date de retour fixe
+    max_stops: 1
+    max_duration_hours: 20                    # durée max de l'aller
+    checked_bag: false                        # true : Google inclut l'estimation du bagage en soute
+    excluded_airlines: []                     # nom (Google) et/ou code IATA (Travelpayouts), ex. [Aeroflot, SU]
+    alert_below: 700                          # alerte si le meilleur prix par personne passe sous ce seuil
+
+  # Une deuxième recherche suivie en parallèle :
+  # - name: Corée juin 2027
+  #   origins: [Paris]
+  #   destination: Corée du Sud
+  #   depart_from: 2027-06-01
+  #   depart_to: 2027-06-30
+  #   stay_days: [14]
