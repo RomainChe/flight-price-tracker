@@ -93,7 +93,7 @@ Deux workflows, dans l'onglet **Actions** :
   - Le run envoie l'e-mail, sans toucher à l'historique ni à `config.yaml`.
   - La règle « départ de Barcelone ou de France » s'applique aussi.
 
-Le cron tourne à 6 h UTC, soit 8 h à Paris l'été et 7 h l'hiver. GitHub n'exécute les crons que sur la **branche par défaut** du dépôt.
+Le cron tourne à 6 h 17 UTC (hors heure pile, créneau le plus chargé où GitHub saute parfois des runs), soit 8 h 17 à Paris l'été et 7 h 17 l'hiver. GitHub n'exécute les crons que sur la **branche par défaut** du dépôt.
 
 ## Limites, en toute transparence
 

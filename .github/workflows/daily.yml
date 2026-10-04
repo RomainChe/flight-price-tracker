@@ -2,7 +2,7 @@ name: Suivi quotidien (config.yaml)
 
 on:
   schedule:
-    - cron: "0 6 * * *"  # 6 h UTC : 8 h à Paris l'été, 7 h l'hiver (GitHub peut retarder de 10 à 30 min)
+    - cron: "17 6 * * *"  # 6 h 17 UTC : 8 h 17 à Paris l'été, 7 h 17 l'hiver (hors heure pile, moins chargée ; GitHub peut retarder de 10 à 30 min)
   workflow_dispatch:
     inputs:
       dry_run:
