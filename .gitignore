@@ -3,3 +3,7 @@ __pycache__/
 .pytest_cache/
 out/
 .env
+
+# Notes Claude perso et sauvegardes
+CLAUDE.local.md
+*.bak
