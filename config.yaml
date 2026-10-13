@@ -13,31 +13,32 @@ defaults:
   passengers: 1
   cabin: economy           # economy, premium-economy, business, first
   currency: EUR
+  # Départs : Barcelone ou aéroports en France, par nom de ville ou code IATA (Paris = CDG + ORY).
+  # Le retour peut se faire vers n'importe laquelle de ces villes.
+  origins: [Barcelone, Paris, Marseille, Lyon, Nice, Toulouse]
+  # Ville (Tokyo), pays (Japon) ou code IATA. Pour un pays, tous ses aéroports internationaux
+  # sont essayés à l'aller comme au retour (open-jaw compris).
+  destination: Japon
+  # destination_airports: [NRT, HND, KIX]   # pour forcer une liste d'aéroports
+  # Règles d'escales : quand elles sont actives, seul Google Flights est interrogé (le cache
+  # Travelpayouts ne détaille ni les escales ni l'attente).
+  max_stops: 2
+  layover_hours: [3, 6]                     # chaque escale, à l'aller comme au retour, entre 3 h et 6 h
+  no_airport_change: true                   # arrivée et départ de l'escale dans le même aéroport
+  # max_duration_hours: 30                  # durée max de l'aller
+  checked_bag: false                        # true : Google inclut l'estimation du bagage en soute
+  excluded_airlines: []                     # nom (Google) et/ou code IATA (Travelpayouts), ex. [Aeroflot, SU]
+  alert_below: 700                          # alerte si le meilleur prix par personne passe sous ce seuil
 
 searches:
+  # 1. Les dates voulues.
   - name: Japon 5-22 mai 2027
-    # Départs : Barcelone ou aéroports en France, par nom de ville ou code IATA (Paris = CDG + ORY).
-    # Le retour peut se faire vers n'importe laquelle de ces villes.
-    origins: [Barcelone, Paris, Marseille, Lyon, Nice, Toulouse]
-    # Ville (Tokyo), pays (Japon) ou code IATA. Pour un pays, tous ses aéroports internationaux
-    # sont essayés à l'aller comme au retour (open-jaw compris).
-    destination: Japon
-    # destination_airports: [NRT, HND, KIX]   # pour forcer une liste d'aéroports
     depart_from: 2027-05-05                   # même jour que depart_to : date de départ fixe
     depart_to: 2027-05-05
     return_date: 2027-05-22                   # date de retour fixe (sinon stay_days: [10, 14, 21])
-    max_stops: 2
-    layover_hours: [3, 6]                     # chaque escale entre 3 h et 6 h
-    no_airport_change: true                   # arrivée et départ de l'escale dans le même aéroport
-    # max_duration_hours: 30                  # durée max de l'aller
-    checked_bag: false                        # true : Google inclut l'estimation du bagage en soute
-    excluded_airlines: []                     # nom (Google) et/ou code IATA (Travelpayouts), ex. [Aeroflot, SU]
-    alert_below: 700                          # alerte si le meilleur prix par personne passe sous ce seuil
 
-  # Une deuxième recherche suivie en parallèle :
-  # - name: Corée juin 2027
-  #   origins: [Paris]
-  #   destination: Corée du Sud
-  #   depart_from: 2027-06-01
-  #   depart_to: 2027-06-30
-  #   stay_days: [14]
+  # 2. Le meilleur prix autour de cette date : départ entre le 5 avril et le 5 juin, séjour de 2 à 2,5 semaines.
+  - name: Japon flexible avril-juin 2027
+    depart_from: 2027-04-05
+    depart_to: 2027-06-05
+    stay_days: [14, 15, 16, 17]
