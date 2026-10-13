@@ -61,10 +61,12 @@ def test_cached_stays_close_to_wanted_duration_are_kept(make_search):
     assert sorted((q.price, q.stay_days) for q in quotes) == [(769, 22), (831, 13)]  # 28 j : trop loin
 
 
-def test_stops_are_dropped_when_layovers_must_be_checked(make_search):
-    s = make_search(layover_hours=[3, 6])
-    quotes, note = tp.collect(s, Context("2027-01-10", token="t"), get=fake_get([]), sleep=lambda _: None)
-    assert quotes == [] and "5 prix avec escale(s) écartés" in note
+@pytest.mark.parametrize("filters", [{"layover_hours": [3, 6]}, {"no_airport_change": True}, {"max_duration_hours": 20}])
+def test_source_is_skipped_when_stops_or_duration_must_be_checked(make_search, filters):
+    # Le cache ne détaille ni les escales ni l'attente : aucun appel, Google Flights seul.
+    calls = []
+    quotes, note = tp.collect(make_search(**filters), Context("2027-01-10", token="t"), get=fake_get(calls), sleep=lambda _: None)
+    assert quotes == [] and calls == [] and "Google Flights" in note
 
 
 def test_collect_without_token_fails_clearly(search):

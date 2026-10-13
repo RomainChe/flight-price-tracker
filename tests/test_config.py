@@ -36,6 +36,15 @@ def test_example_config_is_valid():
     assert s.max_stops == 2 and s.layover_hours == (3, 6) and s.no_airport_change
 
 
+def test_example_config_has_a_flexible_search_around_the_wanted_date():
+    wanted, flex = load_config("config.yaml").searches
+    assert flex.return_date is None and flex.stay_days == [14, 15, 16, 17]
+    assert flex.depart_from < wanted.depart_from < flex.depart_to  # fourchette d'environ 2 mois autour de la date voulue
+    assert (flex.depart_to - flex.depart_from).days <= 62
+    assert (flex.max_stops, flex.layover_hours, flex.no_airport_change) == (wanted.max_stops, wanted.layover_hours, wanted.no_airport_change)
+    assert flex.origin_airports == wanted.origin_airports and flex.name != wanted.name
+
+
 @pytest.mark.parametrize("override, message", [
     ({"origins": ["Madrid"]}, "refusée"),
     ({"stay_days": []}, "stay_days"),

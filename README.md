@@ -10,7 +10,7 @@ Chaque matin, GitHub Actions :
 4. donne une recommandation **ACHETER / ATTENDRE / SURVEILLER**, avec un niveau de confiance et une fenêtre d'achat estimée ;
 5. t'envoie un récapitulatif HTML par e-mail.
 
-Suivi configuré : voyage au Japon du 5 au 22 mai 2027, au départ de Barcelone, Paris, Marseille, Lyon, Nice ou Toulouse. Le projet compare tous les aéroports internationaux japonais, avec 2 escales au maximum, chacune de 3 à 6 h et sans changer d'aéroport.
+Suivi configuré : voyage au Japon du 5 au 22 mai 2027 (plus une recherche « flexible » : meilleur prix pour 14 à 17 jours, départ du 5 avril au 5 juin), au départ de Barcelone, Paris, Marseille, Lyon, Nice ou Toulouse. Le projet compare tous les aéroports internationaux japonais, avec 2 escales au maximum, chacune de 3 à 6 h et sans changer d'aéroport.
 
 Un second workflow, **Recherche ponctuelle**, lance une recherche unique sur n'importe quelle destination, avec des critères saisis dans un formulaire.
 
@@ -79,7 +79,7 @@ Tout se règle dans [`config.yaml`](config.yaml), sans toucher au code.
 - `destination` : une ville (`Tokyo`), un pays (`Japon`) ou un code IATA. Pour un pays, tous ses aéroports internationaux sont essayés, y compris en open-jaw (par exemple arrivée à Tokyo, retour depuis Osaka). Le retour peut se faire vers n'importe quelle ville de départ. Pour un pays absent de la table, ajoute `destination_airports: [CODE, ...]`.
 - `depart_from` / `depart_to`, plus `stay_days` (par exemple `[10, 14, 21]`) ou une `return_date` fixe.
 - `passengers`, `cabin`, `currency`, `max_stops`, `max_duration_hours`, `checked_bag`, `excluded_airlines`, `alert_below`.
-- `layover_hours: [3, 6]` : durée de chaque escale, en heures. `no_airport_change: true` : arrivée et départ de l'escale dans le même aéroport. Ces deux critères sont envoyés à Google, puis revérifiés sur l'aller. Les prix Travelpayouts avec escale sont alors écartés, car son cache ne détaille pas les escales.
+- `layover_hours: [3, 6]` : durée de chaque escale, en heures. `no_airport_change: true` : arrivée et départ de l'escale dans le même aéroport. Ces deux critères sont envoyés à Google, puis revérifiés sur l'aller. Travelpayouts est alors ignoré (comme avec `max_duration_hours`) : son cache ne détaille pas les escales et sa durée exclut l'attente.
 - Pour suivre plusieurs recherches en parallèle, ajoute des entrées sous `searches`. Le budget Google se partage entre elles.
 
 ## Lancer manuellement
